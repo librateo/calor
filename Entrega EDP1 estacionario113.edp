@@ -1,0 +1,126 @@
+border a1(t=3,0) {x=0;y=t;label=1;}
+border a2(t=0,11) {x=t;y=0;label=1;}
+border a3(t=0,6) {x=11;y=t;label=2;}
+border a4(t=11,4) {x=t;y=6;label=1;}
+border a5(t=4,0) {x=t;y=6;label=1;}
+border a6(t=6,3) {x=0;y=t;label=1;}
+border a7(t=0,4) {x=t;y=3;label=3;}
+border a8(t=3,6) {x=4;y=t;label=3;}
+border a9(t=0,2*pi) {x=7+2*cos(t); y=3+2*sin(t); label=4;}
+
+border circ (t=0,2*pi) {x=7+2*cos(t); y=3+2*sin(t);label=3;};
+
+int n=80;
+mesh malla = buildmesh(a1(n)+a2(n)+a3(n)+a4(n)+a5(n)+a6(n)+a7(n)+a8(n)+circ(n));
+
+
+plot(malla,wait=1);
+
+
+fespace Vh(malla,P1);
+Vh reg=region;                
+
+int aluminio = reg (3,3);  //(boder ax, label) 
+                              
+int cobre = reg (1,5);  
+
+int agua=reg(7,3);
+                             
+plot (reg,fill=1);
+
+Vh u,v,uold,uoldt,uu,kk,B,uc,error,a;
+
+
+real h1=14;
+real h2=60;
+
+real epsilon=1.e-6;
+
+real dt=10; 
+
+real u1 = 20 + 273.15; 
+real u2 = 80 + 273.15; 
+
+real T=2000000.;
+
+real sigma = 5.6704*1e-8; //Constante de Stefan-Boltzmann [W/m2.K4]
+real emisividad = 0.3;
+
+real A1,A2,A3;
+
+real den1,cap1;
+den1=8890; cap1=385;	
+
+A1=den1*cap1;
+
+real den2,cap2;
+den2=2700; cap2=938;
+
+A2=den2*cap2;
+
+real den3 = 1000; 
+real cap3 = 4182;
+
+A3=den3*cap3;
+
+a = A1*(region==cobre) + A2*(region==aluminio) + A3(region==agua);
+
+// uoldt=300; //se quita en estacionario	
+
+problem calor (u,v) = int2d(malla)(epsilon*u*v)
+
+// int2d (malla)(a*u*v/dt)-int2d(malla)(a*uoldt*v/dt) //se quita en estacionario
+
++int2d(malla)(kk*dx(u)*dx(v)+kk*dy(u)*dy(v))
+
++ int1d(malla,2) (sigma*emisividad*B*u*v)
+- int1d(malla,2) (sigma*emisividad*B*u2*v)
+
++ int1d(malla,1) (h1*u*v) - int1d(malla,1) (h1*u1*v)  // conveccion
++ int1d(malla,2) (h2*u*v) - int1d(malla,2) (h2*u2*v)
+;  // conveccion
+
+uoldt=u2;
+
+// for(real t=0;t<T;t+=dt) // bucle de iteraciones en el tiempo t desde t=0 hasta t=T //se quita en estacionario
+
+// { //se quita en estacionario
+
+// uold=u0; // valor para arrancar en bucle de linealizacion , es opcional
+real ErrorL2 = 1.; 
+real ErrorH1 = 1.; 
+
+while(sqrt(ErrorL2+ErrorH1) > 1.e-3)
+{
+
+real k1,k2;
+k1=386; //Conductividad del cobre
+k2=229; //Conductividad del aluminio
+
+//Conductividad térmica 
+	kk = k1*(region==cobre) 
+           + k2*(region==aluminio);
+        
+	B = (uold^2 + u2^2)*(uold+u2);
+
+        calor;
+	uc = u-273.15;
+	plot(uc, value=1);
+	error=u-uold;
+	ErrorH1 = int2d(malla)(dx(error)^2+dy(error)^2);
+	ErrorL2 = int2d(malla)(error^2);
+	cout << " Error seminorma H1 = " <<sqrt( ErrorH1) <<endl;
+	cout << " Error L2 = " << sqrt(ErrorL2) <<endl;
+	cout << " Error norma H1 = " << sqrt(ErrorL2+ErrorH1) <<endl;
+	uold=u;  // para usar en la siguiente iteracion al evaluar B
+}
+
+// uoldt=uold;  // en cada iteracion de tiempo considero la temperatura la ultima del bucle while de linealizacion
+//se quita en estacionario
+
+x=7;
+y=3;
+uu=uold(x,y); // temperatura en punto (x,y)
+cout << " u = " <<uu<<endl; // plotea en pantalla
+
+// } //se quita en estacionario
